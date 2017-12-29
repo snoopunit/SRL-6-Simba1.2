@@ -1,0 +1,833 @@
+(*
+Smart
+=====
+
+The Smart file stores all the functions and procedures used to initiate SMART
+in scripts. To use SMART in a script, simply add the following code before SRL is
+included.
+
+.. code-block:: pascal
+
+    {$DEFINE SMART}
+
+The source for this file can be found `here <https://github.com/SRL/SRL-6/blob/master/lib/misc/smart.simba>`_.
+
+*)
+
+{$loadlib libsmartremote}
+
+{$f-}
+
+(*
+var SMART plugins
+~~~~~~~~~~~~~~~~~
+  A TStringArray of smart plugins
+*)
+var
+  smartPlugins: TStringArray = ['OpenGL32.dll', 'd3d9.dll'];
+
+(*
+var User Set
+~~~~~~~~~~~~
+
+Variables that can be used in scripts.
+
+  * smartGetJavaPath - If enabled will attempt to find your java path
+  * smartShowConole - If enabled will show the java console else wont.
+  * smartForceNewClient - If enabled will skip attempting to pair to a previously spawned client
+  * smartEnableDrawing - If enabled will allow drawing on smart.
+  * smartInitSeq - Key that smart will press while smart is loading.
+  * smartUserAgent - The userAgent header (i.e, the 'browser' information sent to the RS server)
+  * smartResetAttempts - The max attempts to respawn SMART during sixHourFix()
+
+*)
+var
+  smartGetJavaPath: boolean := true;
+  smartShowConsole: boolean := true;
+  smartForceNewClient: boolean := false;
+  smartEnableDrawing: boolean := false;
+  smartInitSeq: string := '';
+  smartUserAgent: string := '';
+  smartResetAttempts: integer = 5;
+
+{*
+var Internal
+~~~~~~~~~~~~
+
+Internal SMART variables used only in smart.simba.
+    ** Target <> PID. PID for identifying smarts. Target for targetting a specific applet and cleaning up.
+    * __smartCurrentPid: Keeps track of the current smart PID.
+    * __smartCurrentTarget: Keeps track of the current smart target.
+    * __smartIsDrawingSetup: Keeps track if smart drawing is setup or not.
+    * __smartNativeDebugButtonID: The id of the debug button (if not using a native button) set as -1.
+    * __smartClientWidth, __smartClientHeight - The dimensions of the smart client
+    * smartImage: TMufasaBitmap that is displayed onto smart.
+*}
+{$IFNDEF CODEINSIGHT}
+  __smartCurrentPid: integer := 0;
+  __smartCurrentTarget: integer := 0;
+  __smartIsDrawingSetup: boolean := False;
+  __smartNativeDebugButtonID: integer := 101;
+  __smartClientWidth: integer := 800;
+  __smartClientHeight: integer := 600;
+{$ENDIF}
+  smartImage: TMufasaBitmap;
+
+
+function _LocateJavaPath(var Res: String; x86: Boolean; Dir: char = 'A'; Recursive: Boolean = False): Boolean;
+
+  function GetDirectoryName(Directory, Path: String): String;
+  var
+    I: Integer;
+    Directories: TStringArray;
+  begin
+    Directories := GetDirectories(Path);
+    for I := 0 To High(Directories) Do
+      if ExecRegExpr(Directory, Directories[I]) then
+      begin
+        Result := Directories[I];
+        Exit;
+      end;
+  end;
+
+  function GetDirectoryNames(Directory, Path: String): TStringArray;
+  var
+    I: Integer;
+    Directories: TStringArray;
+  begin
+    Directories := GetDirectories(Path);
+    for I := 0 To High(Directories) Do
+      if ExecRegExpr(Directory, Directories[I]) then
+        Result := Result + Directories[I];
+  end;
+
+  function FindDirectory(Directory, Path: String): Boolean;
+  begin
+    Result := Length(GetDirectoryName(Directory, Path)) > 0;
+  end;
+
+var
+  Drive: String;
+  CurrentPath, c: String;
+  Drives: TStringArray;
+  i: Integer;
+begin
+  Result := False;
+  Res := '';
+
+  if (Recursive) then
+  begin
+    Drive := Dir + ':/';
+  end else
+    Drive := Copy(PluginPath, 0, 3);
+
+  if (x86) then
+    CurrentPath := Drive + 'Program Files (x86)\'
+  else
+   CurrentPath := Drive + 'Program Files\';
+
+  if (FindDirectory('Java|java', CurrentPath + '\')) then
+  begin
+    CurrentPath := CurrentPath + 'Java\';
+  end else
+    if (Dir <> 'Z') then
+      Result := _LocateJavaPath(Res, x86, chr(ord(Dir) + 1), True);
+
+  if (Result) then
+    Exit();
+
+  Drives := GetDirectoryNames('jre', CurrentPath);
+
+  if (Length(Drives) > 0) then
+  begin
+    c := CurrentPath;
+    for i := 0 to High(Drives) do
+      begin
+        CurrentPath := c;
+        if (smartShowConsole) then
+          CurrentPath := CurrentPath + Drives[i] + '\bin\java.exe'
+        else
+          CurrentPath := CurrentPath + Drives[i] + '\bin\javaw.exe';
+
+        Result := FileExists(CurrentPath);
+        if (Result) then
+          Break;
+      end;
+  end else begin
+    Drives := GetDirectoryNames('jdk', CurrentPath);
+    c := CurrentPath;
+
+    for i := 0 to High(Drives) do
+    begin
+      CurrentPath := c;
+      if (smartShowConsole) then
+        CurrentPath := CurrentPath + Drives[i] + '\bin\java.exe'
+      else
+        CurrentPath := CurrentPath + Drives[i] + '\bin\javaw.exe';
+
+      Result := FileExists(CurrentPath);
+      if (Result) then
+        Break;
+    end;
+  end;
+
+  Result := FileExists(CurrentPath);
+  Res := CurrentPath;
+end;
+
+function FindJavaPath(out Path: String): Boolean;
+begin
+  if (not _LocateJavaPath(Path, True)) then
+    if (not _LocateJavaPath(Path, False)) then
+      Exit(False);
+
+  Result := True;
+end;
+
+(*
+getJavaPath
+~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     function getJavaPath(): string;
+
+Will return the Java path needed for the first parameter of SmartSpawnClient.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 26 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+   s := getJavaPath();
+*)
+function getJavaPath(): string;
+begin
+  print('getJavaPath():', TDebug.HEADER);
+  {$IFDEF WINDOWS}
+  if (not smartGetJavaPath) then
+  begin
+    if (smartShowConsole) then
+      result := 'java.exe'
+    else
+      result := 'javaw.exe';
+
+    print('Not searching for your Java path. Make sure the JRE is in your system''s PATH before JDK (if you have JDK).', TDebug.WARNING);
+    print('getJavaPath()', TDebug.FOOTER);
+    exit();
+  end;
+
+  print('Attempting to search for your Java path');
+
+  if (findJavaPath(result)) then
+    print('Found your java path @ ' + result)
+  else begin
+    print('Failed to find your Java path', TDebug.WARNING);
+    print('If RS is failing to switch to OpenGL mode, add JRE to your systems path before JDK (if you have JDK)', TDebug.HINT);
+  end;
+  {$ELSE}
+  print('Not searching for your Java path. Make sure the JRE is in your system''s PATH before JDK (if you have JDK).', TDebug.WARNING);
+
+  Result := 'java';
+  if (not (smartShowConsole)) then
+    Result := Result + 'w';
+  {$ENDIF}
+  print('getJavaPath()', TDebug.FOOTER);
+end;
+
+(*
+smartSetDebug; overload
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartSetDebug(enable: boolean); overload;
+
+Overloaded function that toggles the debug image on smart without needing the
+target parameter.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 26 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+   smartSetDebug(true);
+*)
+procedure smartSetDebug(enable: boolean); overload;
+begin
+  if (__smartNativeDebugButtonID <> -1) then
+  begin
+    smartSetNativeButton(__smartCurrentTarget, 0, __smartNativeDebugButtonID, not enable);
+    smartSetNativeButton(__smartCurrentTarget, 1, __smartNativeDebugButtonID, not enable);
+  end else
+    smartSetDebug(__smartCurrentTarget, enable);
+end;
+
+(*
+smartGetParameters
+~~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+    function smartGetParameters(out params: array of string): boolean;
+
+Attempts to grab the correct parameters for spawning a SMART client. Results if
+succesfull or not.
+
+.. note::
+
+    - By: Brandon, Mormanman, Benland100
+    - Last Updated: 26 May 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+    smartGetParameters(tsa);
+*)
+function SmartGetParameters(out params: TStringArray): Boolean;
+var
+  WorldLink: String;
+  p: Integer;
+begin
+  WorldLink := Between('var worldLink=', ''',', GetPage('http://www.runescape.com/game-applet'));
+  if (WorldLink = '') then
+    Exit(False);
+
+  p := Pos('com/', WorldLink);
+  Params := Params + Copy(WorldLink, 2, p + 2);
+  Params := Params + Copy(WorldLink, p + 4, Length(WorldLink));
+
+  Result := True;
+end;
+
+(*
+smartSetAsTarget
+~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     function smartSetAsTarget(pid: integer): boolean;
+
+Pairs Simba to the smart client via EIOS.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 28 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+function smartSetAsTarget(pid: Int32): boolean;
+begin
+  result := true;
+
+  try
+    setEIOSTarget('libsmartremote', intToStr(pid));
+    print('smartSetAsTarget(): Succesfully set SMART['+ intToStr(pid) +'] as Simba''s target', TDebug.SUB);
+  except
+    print('smartSetAsTarget(): Failed to set SMART['+ intToStr(pid) +'] as Simba''s target', TDebug.SUB);
+    result := false;
+  end;
+end;
+
+(*
+smartCreateClient
+~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartCreateClient(w, h: integer);
+
+Creates a smart client using the dimensions "w" and "h".
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 28 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+    smartCreateClient(800, 600);
+
+*)
+function smartCreateClient(w, h: integer): boolean;
+var
+  plugins: string;
+  params: TStringArray;
+  path: string;
+begin
+  print('smartCreateClient():', TDebug.HEADER);
+
+  if (not smartGetParameters(params)) then
+  begin
+    print('Failed to grab parameters', TDebug.FOOTER);
+    exit(false);
+  end;
+
+  path := getJavaPath();
+  plugins := implode(',', smartPlugins);
+
+  print('Root: ' + params[0]);
+  print('Params: ' + params[1]);
+  print('Using plugins "' + plugins + '"');
+
+  __smartCurrentTarget := 0;
+  __smartCurrentTarget := smartSpawnClient(path, stringReplace(PluginPath, '\', '/', [rfReplaceAll]),
+                                           params[0], params[1], w, h, smartInitSeq, smartUserAgent,'', plugins);
+
+  if (__smartCurrentTarget <> 0) then
+  begin
+    print('Succesfully spawned a client, attempting to target');
+
+    __smartCurrentPID := smartGetClientPID(__smartCurrentTarget);
+
+    if (smartSetAsTarget(__smartCurrentPID)) then
+    begin
+      print('smartCreateClient(): result = true', TDebug.FOOTER);
+      result := true;
+    end;
+  end else
+    print('Failed to spawn a SMART client', TDebug.FOOTER);
+end;
+
+(*
+smartGetPIDs
+~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     function smartGetPIDs(): TIntegerArray;
+
+Returns all true, non pair PIDs of smart clients.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: August 28, 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+    tia := smartGetPIDs();
+*)
+function smartGetPIDs(): TIntegerArray;
+var
+  i, count: Integer;
+begin
+  count := SmartGetClients(true);
+  setLength(result, count);
+
+  if (count > 0) then
+    for i := 0 to (count - 1) do
+      result[i] := SmartGetAvailablePID(i);
+end;
+
+(*
+smartPairToExistingClient
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     function smartPairToExistingClient(): boolean;
+
+Attempts to pair us to a previously spawned smart client, will result true if
+succesfull.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: August 28, 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+function smartPairToExistingClient(): boolean;
+var
+  pidArr: TIntegerArray;
+  t: PtrUInt;
+  i, p: Int32;
+begin
+  result := false;
+
+  print('smartPairToExistingClient():', TDebug.HEADER);
+
+  pidArr := smartGetPIDs();
+
+  if (length(pidArr) < 1) then
+  begin
+    print('Found no free clients to pair to');
+    print('smartPairToExistingClient(): result = false', TDebug.FOOTER);
+    exit();
+  end;
+
+  print('Found ' + intToStr(length(pidArr)) + ' free client(s), attempting to pair to one...');
+
+  for i := 0 to high(pidArr) do
+  begin
+    t := 0;
+    t := SmartPairClient(pidArr[i]);
+
+    if (t <> 0) then
+    begin
+       p := pidArr[i];
+
+       result := smartSetAsTarget(p);
+
+       if (result) then
+       begin
+         __smartCurrentPID := p;
+         __smartCurrentTarget := t;
+
+         if (not (smartEnabled(__smartCurrentTarget))) then
+           smartSetEnabled(__smartCurrentTarget, True);
+
+         print('Succesfully paired to a existing client, SMART['+ intToStr(__smartCurrentPID) +']');
+         print('smartPairToExistingClient(): result = true', TDebug.FOOTER);
+         addOnTerminate('smartFreeCurrentClient');
+         exit();
+       end;
+    end else begin
+      print('Failed to pair to SMART['+ intToStr(pidArr[i]) +']');
+      smartFreeClient(t);
+    end;
+  end;
+
+  print('smartPairToExistingClient(): result = false', TDebug.FOOTER);
+end;
+
+(*
+initSmart
+~~~~~~~~~
+
+.. code-block:: pascal
+
+    procedure initSmart();
+
+Initializes a SMART client. If it cannot pair to an existing client, it will
+attempt to spawn a client. It will terminate the script if anything goes wrong.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 26 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+function initSmart(forceNew: boolean): boolean;
+begin
+  print('initSmart():', TDebug.HEADER);
+
+  if (not forceNew) then
+  begin
+    print('Attempting to pair to a previously spawned client');
+
+    if (smartPairToExistingClient()) then
+    begin
+      print('Succesfully initialized via pairing to a previously spawned client');
+      print('initSmart()', TDebug.FOOTER);
+      exit(true);
+    end;
+  end;
+
+  print('Attempting to spawn a new client..');
+
+  if smartCreateClient(__smartClientWidth, __smartClientHeight) then
+  begin
+    result := true;
+    print('Succesfully initialized via spawning a new client');
+  end;
+
+  smartSetDebug(false);
+  addOnTerminate('smartFreeCurrentClient');
+
+  print('initSmart() result = ' + boolToStr(result), TDebug.FOOTER);
+end;
+
+(*
+smartFreeCurrentClient
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartFreeCurrentClient();
+
+Frees our current smart client.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 28 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+procedure smartFreeCurrentClient();
+begin
+  try
+    smartFreeClient(__smartCurrentTarget);
+    print('Succesfully freed SMART[' + intToStr(__smartCurrentPid) + ']');
+  except
+    print('Error freeing SMART[' + intToStr(__smartCurrentPid) + ']', TDebug.ERROR);
+  end;
+end;
+
+(*
+smartSetupDrawing
+~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartSetupDrawing();
+
+Setups SMART so it's ready to be drawn on-to.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 28 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+procedure smartSetupDrawing();
+begin
+  if __smartIsDrawingSetup then
+    exit();
+
+  smartSetDebug(true);
+
+  try
+    smartImage.init(Client.getMBitmaps());
+    smartImage.setName('SMART Debug Image');
+    smartImage.setPersistentMemory(SmartDebugArray(__smartCurrentTarget), __smartClientWidth, __smartClientHeight);
+    smartImage.drawClear(0);
+
+    print('smartSetupDrawing(): Succesfully setup SMART drawing', TDebug.SUB);
+  except
+    print('smartSetupDrawing(): Unable to setup SMART drawing', TDebug.FATAL);
+  end;
+
+  __smartIsDrawingSetup := true;
+  addOnTerminate('smartFreeDrawing');
+end;
+
+(*
+smartFreeDrawing
+~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartFreeDrawing();
+
+Frees the TMufasaBitmap used for smart drawing.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 28 August 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+procedure smartFreeDrawing();
+begin
+  try
+    smartImage.resetPersistentMemory();
+    smartImage.free();
+  except
+  finally
+    __smartIsDrawingSetup := false;
+  end;
+end;
+
+(*
+smartReloadClient
+~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure smartReloadClient();
+
+Kills the current client, and spawns a new one. The 'waitTime' parameter is
+how long to wait after killing the client before spawning a new one.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 20 September 2013 by Olly
+
+Example:
+
+.. code-block:: pascal
+
+    smartReloadClient(60000);
+*)
+procedure smartReloadClient(waitTime: integer);
+var
+  img, r, h, m, s: integer;
+begin
+  print('smartReloadClient():', TDebug.HEADER);
+  img := -999;
+  ConvertTime(waitTime, h, m, s);
+
+  if __smartIsDrawingSetup then
+  begin
+    img := copyBitmap(smartImage.getIndex());
+    smartFreeDrawing();
+  end;
+
+  r := SmartGetRefresh(__smartCurrentTarget);
+
+  smartFreeCurrentClient();
+  smartKillClient(__smartCurrentPID);
+
+  print('Killed current client. Waiting ' + intToStr(m) + 'm & ' + intToStr(s) + 's before reloading SMART');
+  wait(waitTime);
+
+  if initSmart(true) then
+  begin
+    print('Setting refresh rate back to ' + intToStr(r));
+    SmartSetRefresh(__smartCurrentTarget, r);
+
+    if bitmapExists(img) then
+    begin
+      smartSetupDrawing();
+
+      print('Re-drawing the smartImage bitmap');
+
+      getMufasaBitmap(img).drawTransparent(0, 0, smartImage);
+      freeBitmap(img);
+    end;
+  end;
+
+  print('smartReloadClient()', TDebug.FOOTER);
+end;
+
+(*
+sixHourFix
+~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure sixHourFix();
+
+Kills the current client, spawns a new one, and then logs the currentPlayer back
+into the game.
+
+.. note::
+
+    - By: Olly
+    - Last Updated: 1 July 2015 by The Mayor
+
+Example:
+
+.. code-block:: pascal
+
+*)
+procedure sixHourFix();
+var
+  i: integer;
+begin
+  print('sixHourFix():', TDebug.HEADER);
+
+  for i := 1 to smartResetAttempts do
+  begin
+    print('SMART Reload Attempt ' + toStr(i) + '/' + toStr(smartResetAttempts));
+
+    if (players.getActive() < 1) then
+      print('No active players, no use in reloading the client!', TDebug.FATAL);
+
+    smartReloadClient(60 * randomRange(3000, 10000));
+
+    if waitClientReady() then
+    begin
+      print('Client succesfully loaded after reload');
+
+      if (players[currentPlayer].login()) then
+      begin
+        print('sixHourFix(): Succesfully logged in after reload', TDebug.FOOTER);
+        exit();
+      end else
+        print('Failed to login player after restart attempt ' + toStr(i), TDebug.ERROR);
+    end else
+      if i = smartResetAttempts then
+        print('Client never reloaded after ' + toStr(i) + ' attempts', TDebug.FATAL);
+
+    inc(i);
+  end;
+end;
+
+(*
+__smartCheckPlugins
+~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: pascal
+
+     procedure __smartCheckPlugins();
+
+Checks what plugins are present in the plugins folder and warns the user if the
+directX of OpenGL ones are missing.
+
+.. note::
+
+    - By: Olly
+
+Example:
+
+.. code-block:: pascal
+
+*)
+{$IFNDEF CODEINSIGHT}
+procedure __smartCheckPlugins();
+var
+  dx, ogl: boolean;
+begin
+  dx := fileExists(pluginPath + 'd3d9.dll');
+  ogl := fileExists(pluginPath + 'OpenGL32.dll');
+
+  if (dx = false) and (ogl = false) then
+    print('No SMART Plugins found, make sure you update your plugins!', TDebug.FATAL);
+
+  if (dx = true) and (ogl = false) then
+    print('Only found the direct-x plugin, you must be in direct-x mode!');
+
+  if (dx = false) and (ogl = true) then
+    print('Only found the OpenGL plugin, you must be in OpenGL mode');
+end;
+{$ENDIF}
+
+begin
+  SRL_Events[EVENT_RS_UPDATE] := sixHourFix;
+
+  {$IFDEF WINDOWS}
+  __smartCheckPlugins();
+  {$ENDIF}
+end;
+
+{$f+}
