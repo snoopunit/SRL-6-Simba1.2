@@ -507,7 +507,7 @@ Example:
     chooseOption.select(['Walk here']);
     chooseOption.select(['Walk here'], 250, True); // To use tesseract
 *)
-function TRSChooseOption.select(txt: TStringArray; waitTime: integer = 250; useTesseract: boolean = false; filter: TTesseractFilter = TESS_FILTER_CHOOSE_OPTION): boolean; overload;
+function TRSChooseOption.select(txt: TStringArray; waitTime: integer = 600; useTesseract: boolean = false; filter: TTesseractFilter = TESS_FILTER_CHOOSE_OPTION): boolean; overload;
 begin
   result := self.__select(txt, MOUSE_LEFT, true, 1.00, waitTime, useTesseract, filter);
 end;

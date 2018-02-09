@@ -7,7 +7,7 @@ The lobby file holds functions and procedures that are used in the runescape lob
 The source for this file can be found `here <https://github.com/SRL/SRL-6/blob/master/lib/interfaces/lobby/lobby.simba>`_.
 
 *)
-
+{$include_once NAS/NAS.simba}
 {$f-}
 
 (*
@@ -112,7 +112,7 @@ begin
     parentID := -1;
     isStatic := true;
     setBounds([580, 20, 1340, 560]);
-    tabBoxes := grid(6, 1, 70, 22, 100, 0, point(650, 125));
+    tabBoxes := grid(6, 1, 40, 23, 100, 0, point(650, 125));
   end;
 end;
 {$ENDIF}
@@ -184,17 +184,17 @@ Example:
 
 function TRSLobby.isOpen(): boolean;
 const
-  COLOR = 15576597;
+  COLOR = 3847161;
 var
   t: LongWord;
   button: TBox;
 begin
-  button := [1127, 522, 1172, 542];
+  button := [1322, 26, 1342, 46];
 
   t := (getSystemTime() + randomRange(7500, 8500));
   result := false;
 
-  self.__skipEmailScreen();
+  //self.__skipEmailScreen();
 
   result := findColorSpiralTolerance(x, y, COLOR, button, 11, colorSetting(2, 0.09, 0.66));  //looks for blue fav world buttons in lobby
 end;
@@ -450,9 +450,9 @@ Example:
 *)
 function TRSLobby.quickSelectWorld(const World: Integer; click: boolean = true): boolean;
 var
-  Boxes: TBoxArray;
+  Boxes, FavWorlds: TBoxArray;
   fWorlds: array [0..2] of Integer;        //Note this should be moved to worlds.simba probably
-  i, tab: Integer;
+  i, tab, pick: Integer;
 begin
   if (not self.isOpen()) then
     exit();
@@ -461,8 +461,8 @@ begin
   tab := self.getCurrentTab();
 
   case tab of
-    LOBBY_PLAYER, LOBBY_FRIENDS..LOBBY_CLAN: boxes := grid(3, 1, 37, 16, 62, 0, point(self.x2 - 193, self.y2 - 54));
-    LOBBY_WORLDS: boxes := grid(3, 1, 37, 16, 62, 0, point(self.x2 - 193, self.y2 - 30));
+    LOBBY_PLAYER, LOBBY_FRIENDS..LOBBY_CLAN: boxes := grid(3, 1, 37, 20, 62, 0, point(self.x2 - 193, self.y2 - 26));
+    LOBBY_WORLDS: boxes := grid(3, 1, 37, 20, 62, 0, point(lobby.x2 - 193, lobby.y2 + 455));
   else
     if (not self.openTab(LOBBY_PLAYER)) then
       exit();
@@ -474,9 +474,23 @@ begin
     fWorlds[i] := -1;
 
     if (countColorTolerance(12484874, boxes[i], 20, colorSetting(1)) > 10) then // Check if fav world exists (Light blue).
-      fWorlds[i] := strToIntDef(tesseract_getText(boxes[i].x1, boxes[i].y1, boxes[i].x2, boxes[i].y2, TTesseractFilter([5, 5, [true, -40, TM_Mean]]), TESS_WHITELIST_NUMBERS), -1);
+      //fWorlds[i] := strToIntDef(tesseract_getText(boxes[i].x1, boxes[i].y1, boxes[i].x2, boxes[i].y2, TTesseractFilter([5, 5, [true, -40, TM_Mean]]), TESS_WHITELIST_NUMBERS), -1);
+    begin
+      setLength(FavWorlds, i+1);         //set length of available fav worlds
+      FavWorlds[i] := boxes[i];        //add current box to available FavWorlds
+    end;
   end;
 
+  if length(FavWorlds) < 1 then
+    exit(false)
+  else
+    result := true;
+
+  pick := random(length(FavWorlds));
+
+  mouseBox(FavWorlds[pick], MOUSE_LEFT);
+
+  (*
   printf('TRSLobby.quickSelectWorld(): Found worlds %s', [toString(fWorlds)]);
 
   if (inIntArrayEx(fWorlds, i, world)) then
@@ -488,6 +502,7 @@ begin
     end;
     exit(true);
   end;
+  *)
 end;
 
 begin

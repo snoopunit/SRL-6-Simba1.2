@@ -352,16 +352,16 @@ begin
     symbolAccuracy := 0.65;
     bmpMask := BitmapFromString(224, 189, 'meJzt0olhpAAAw8D03/RdA+TbwEoYTQmWPz6SJEmSJEmSJ/qXH6ArPRSd/U7oVo9DB78futiD0Knviu72CHTke6PrjaPzLqAbzqLD7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr7qBLbqKr5jT0lS5Bj5ozdY/Idc7Idc7Idc7Idc7Idc7Idc7I9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y9c+Y/fyfXTRv9qtzdtG80wvn7KJ5j5fP2UVztT+es4vmOqecs4vmCiees4vmXKefs4vmLBeds3/mFP0zZv0zZv0zZv0zZv0zZv0zZv0zZv0zZv0zZv0zZv0zZm/4Z3/Oy67758voSXKh337g0qf9BbhhTke/6RL0qDkBfaJr0evmT+j7vAO9cV5EH+d96KXza/Rl3o3eO79An4VBr54foW+CoYfP9+iPwOj58w36IDB6/nyFfgePLpCv0O9QoCPkU/Q1FOgIOUb/woLukGP0LyzoDjlG/8KC7pBj9C8s6A45Rv/Cgu6QY/QvLOgOOUb/woLukGP0LyzoDjlG/8KC7pBj9C8s6A45Rv/Cgu6QY/QvFOgI+RR9DQU6Qr5Cv4NHF8hX6HfcDJ3rcejg90MXW0A3HEfnvTe63iPQke+K7vYgdOr7oYs9Dh38TuhWD0Vnvwe60qPR8e3oPk9H91ej4yRJkiRJkiSk/xotWe8=');
     setBitmapName(bmpMask, 'Minimap Mask');
-    setBounds([1584,14,1918,324]);
+    setBounds([1697,14,1918,202]);
                                       { Bounds | Center | Radius }
     //button[MM_BUTTON_COMPASS]   := [[582, 18, 614, 50], [598, 34], 15];
-    button[MM_BUTTON_COMPASS]   := [[1592, 18, 1624, 50], [1608, 34], 15];
+    button[MM_BUTTON_COMPASS]   := [[1700, 16, 1735, 53], [1718, 33], 15];
     //button[MM_BUTTON_RUN]       := [[759, 18, 793, 52], [776, 35], 16];
-    button[MM_BUTTON_RUN]       := [[1879, 18, 1911, 52], [776, 35], 16];
+    button[MM_BUTTON_RUN]       := [[1879, 16, 1911, 52], [1896, 35], 16];
     //button[MM_BUTTON_LODESTONE] := [[586, 161, 613, 188], [599, 174], 13];
-    button[MM_BUTTON_LODESTONE] := [[1596, 285, 1624, 316], [1610, 302], 13];
+    button[MM_BUTTON_LODESTONE] := [[1703, 165, 1735, 195], [1719, 180], 13];
     //button[MM_BUTTON_MAP]       := [[764, 162, 788, 187], [776, 174], 12];
-    button[MM_BUTTON_MAP]       := [[1879, 285, 1911, 316], [776, 174], 12];
+    button[MM_BUTTON_MAP]       := [[1879, 165, 1911, 195], [1896, 180], 12];
     with (Button[MM_BUTTON_COMPASS]) do
     begin
       CompassEdge := TPAFromCircle(Center.x, Center.y, Radius);
@@ -453,8 +453,9 @@ var
 begin
   with (Self.Button[MM_BUTTON_COMPASS]) do
   begin
-    FindColorsTolerance(tDial, 9477483, Bounds, 25, ColorSetting(2, 2.20, 0.97));
-    FilterPointsDist(tDial, 12, 15, Center.x, Center.y);
+    //FindColorsTolerance(tDial, 9477483, Bounds, 25, ColorSetting(2, 2.20, 0.97));
+    FindColorsTolerance(tDial, 12434877, minimap.button[0].bounds, 10, ColorSetting(2, 0.00, 0.00));
+    FilterPointsDist(tDial, 8, 15, Center.x, Center.y);
     Mid := Center;
     GetMousePos(mX, mY);
     MouseHovered := (Distance(Point(mX, mY), Mid) <= Radius);
