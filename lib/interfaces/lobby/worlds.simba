@@ -101,8 +101,6 @@ var
 
 Internal worlds interface variables
 *}
-var
-  __worldsOrdered: boolean; // set to true if the worlds get ordered in the sorting functions
 
 (*
 TRSLobbyWorlds methods

@@ -393,7 +393,6 @@ Example:
 *)
 function TBoxArray.toTPA() : TPointArray; constref;
 var
-  i : integer;
   atpa: T2DPointArray;
 begin
   atpa := self.toATPA();
@@ -563,8 +562,6 @@ Example:
 
 *)
 function TBoxArray.getMiddle(): TPoint; constref;
-var
-  i : integer;
 begin
   result := self.getBounds().getMiddle();
 end;
@@ -772,7 +769,6 @@ Example:
 function TBoxArray.colorExists(color: integer; tolerance: integer = 0): boolean; constref;
 var
   i : integer;
-  tia: TIntegerArray;
 begin
   for i := 0 to high(self) do
     if (self[i].colorExists(color, tolerance)) then

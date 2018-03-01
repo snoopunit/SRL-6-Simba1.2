@@ -350,8 +350,9 @@ var
   b: TBox;
 begin
   getClientDimensions(w, h);
-                          // Black box around "BANK OF RUNESCAPE"
-  if findColors(TPA, 65536, 0, 0, w-1, 50) then
+                          // Black box around "BANK OF RUNESCAPE
+  b := [622, 230, 1102, 820];
+  if findColors(TPA, 65536, b) then
   begin
     ATPA := TPA.cluster(5);
     ATPA.sortBySize(true);
@@ -368,7 +369,7 @@ begin
         begin
           ATPA2 := TPA.cluster(5);
 
-          if length(ATPA2) = 6 then // 6 green arrows
+          if length(ATPA2) = 4 then // 6 green arrows
           begin
             b.edit(-8, -562, 200, 7);
             self.setBounds(b);

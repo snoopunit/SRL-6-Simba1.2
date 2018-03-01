@@ -136,7 +136,6 @@ All the variables associated with players.simba.
 var
   players: TPlayerArray;
   currentPlayer: integer;
-  disableIPScreenshots: boolean;
 
 {*
 Raf_GetArmyNames

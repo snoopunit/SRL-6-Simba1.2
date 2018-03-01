@@ -86,18 +86,18 @@ begin
   writeln('Armys found: '+toStr(result));
 end;
 
-procedure openArmyForm_OnTimer(sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure openArmyForm_OnTimer(_, sender: TObject);
 begin
   openArmyForm.btnLoad.setCaption('Load Army "'+openArmyForm.comboBox.getText()+'"');
 end;
 
-procedure openArmyForm_OnClick(sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure openArmyForm_OnClick(_, sender: TObject);
 begin
   openArmyForm.selectedArmy := openArmyForm.comboBox.getCaption();
   openArmyForm.frm.close();
 end;
 
-procedure openArmyForm_Init(); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure openArmyForm_Init();
 var
   armys: TStringArray;
   i: integer;
@@ -154,7 +154,7 @@ begin
       setParent(frm);
       setBounds(20, 40, 200, 25);
       setCaption('Load Army');
-      setOnClick(openArmyForm_OnClick);
+      setOnClick(@openArmyForm_OnClick);
     end;
 
     timer.init(frm);
@@ -162,7 +162,7 @@ begin
     with timer do
     begin
       setInterval(150);
-      setOnTimer(openArmyForm_OnTimer);
+      setOnTimer(@openArmyForm_OnTimer);
     end;
 
     frm.showModal();
@@ -171,10 +171,10 @@ begin
 end;
 
 {$IFNDEF CODEINSIGHT} function loadArmy(const armyName: string): boolean; forward; {$ENDIF}
-procedure openArmyForm_Show(sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure openArmyForm_Show(_,sender: TObject);
 begin
   try
-    sync(openArmyForm_Init);
+    sync(@openArmyForm_Init);
   except
     writeln('ERROR: Unable to show OpenArmyForm');
   finally
@@ -273,7 +273,7 @@ begin
     writeln('Unable to save player, Could not get player index!');
 end;
 
-procedure newArmy(sender: TObject);  {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure newArmy(_,sender: TObject);
 begin
   setLength(army.players, 0);
 
@@ -294,7 +294,7 @@ begin
 end;
 
 // deletes the current loaded army
-procedure deleteArmy(sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure deleteArmy(_,sender: TObject);
 
   // can't use the native version
   procedure newArmy();
@@ -500,7 +500,7 @@ begin
   end;
 end;
 
-procedure onClick(sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure onClick(_,sender: TObject);
 var
   index: integer;
 begin
@@ -524,7 +524,7 @@ begin
   end
 end;
 
-procedure onHoverButton(Sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure onHoverButton(_,Sender: TObject);
 begin
   with rafikiForm do
   case sender of
@@ -542,7 +542,7 @@ begin
   end;
 end;
 
-procedure onShow(Sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure onShow(_,Sender: TObject);
 begin
   rafikiForm.memo_DebugBox.setItemIndex(rafikiForm.memo_DebugBox.getItems().getCount() - 1);  // trick to get listbox to scroll to bottom
   rafikiForm.memo_DebugBox.setItemIndex(-1); // :)
@@ -556,14 +556,14 @@ begin
   self.img1.setParent(parent);
   self.img1.setBounds(bounds.x1, bounds.y1, bounds.x2, bounds.y2);
   self.img1.getPicture().setBitmap(bmp1);
-  self.img1.setOnMouseEnter(onHoverButton);
+  self.img1.setOnMouseEnter(@onHoverButton);
 
   self.img2.init(parent);
   self.img2.setParent(parent);
   self.img2.setBounds(bounds.x1, bounds.y1, bounds.x2, bounds.y2);
   self.img2.getPicture().setBitmap(bmp2);
-  self.img2.setOnMouseLeave(onHoverButton);
-  self.img2.setOnClick(onClick);
+  self.img2.setOnMouseLeave(@onHoverButton);
+  self.img2.setOnClick(@onClick);
   self.img2.hide();
   self.img2.setHint(hint);
   self.img2.setShowHint(true);
@@ -602,7 +602,7 @@ begin
 end;
 
 // toggleEncyption: Called when encrpytion is clicked.
-procedure toggleEncyption(const sender: TObject); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure toggleEncyption(_, sender: TObject);
 begin
   army.encrpyted := (not army.encrpyted);
   rafikiForm.encyrptionMenu_Item.setChecked(army.encrpyted);
@@ -629,7 +629,7 @@ begin
 end;
 
 // initForm: initializes the form.
-procedure initForm(); {$IFNDEF CODEINSIGHT} native; {$ENDIF}
+procedure initForm();
 var
   i: integer;
   strings: TStringArray;
@@ -646,7 +646,7 @@ begin
       setBorderStyle(bsSingle);
       setWidth(500);
       setHeight(383);
-      setOnShow(onShow);
+      setOnShow(@onShow);
     end;
 
     playerList.init(frm);
@@ -655,7 +655,7 @@ begin
     begin
       setParent(frm);
       setBounds(10, 30, 260, 200);
-      setOnClick(onClick);
+      setOnClick(@onClick);
     end;
 
     labelPlayerCount.init(frm);
@@ -784,7 +784,7 @@ begin
 
         setBounds(boxes[i].x1, boxes[i].y1, boxes[i].x2, boxes[i].y2);
         setCaption(strings[i]);
-        setOnClick(onClick);
+        setOnClick(@onClick);
       end;
     end;
 
@@ -809,9 +809,9 @@ begin
       end;
 
       case i of
-        0: fileMenu_Items[i].setOnClick(newArmy);
-        1: fileMenu_Items[i].setOnClick(openArmyForm_Show);
-        2: fileMenu_Items[i].setOnClick(deleteArmy);
+        0: fileMenu_Items[i].setOnClick(@newArmy);
+        1: fileMenu_Items[i].setOnClick(@openArmyForm_Show);
+        2: fileMenu_Items[i].setOnClick(@deleteArmy);
       end;
     end;
 
@@ -819,7 +819,7 @@ begin
 
     encyrptionMenu := mainMenu.addMenu('Encryption');
     encyrptionMenu_Item := encyrptionMenu.addMenu('Enable (Click to activate)');
-    encyrptionMenu_Item.setOnClick(toggleEncyption);
+    encyrptionMenu_Item.setOnClick(@toggleEncyption);
 
     memo_DebugBox.init(frm);
 
@@ -849,7 +849,7 @@ begin
   writeln('Showing Rafiki player manager');
 
   try
-    sync(initForm);
+    sync(@initForm);
   except
     writeln('ERROR: Unable to show Rafiki player manager');
   finally
@@ -859,5 +859,3 @@ begin
     settings.setPrefix(s);
   end;
 end;
-
-
